@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { globTool, grepTool, globToRegex, walkFiles } from "../src/tools/search.js";
+import { globTool, grepTool, globToRegex, walkFiles, grepWithJs } from "../src/tools/search.js";
 import { ArtifactStore } from "../src/context/artifacts.js";
 import { ReadState } from "../src/tools/readstate.js";
 import type { ToolContext } from "../src/tools/registry.js";
@@ -76,5 +76,26 @@ describe("grep tool", () => {
     expect(out).toContain("HeLLo");
     const none = await grepTool.execute({ pattern: "hello" }, ctx);
     expect(none).toMatch(/No matches/);
+  });
+
+  it("pure-JS fallback (grepWithJs) matches regardless of ripgrep presence", () => {
+    fs.writeFileSync(path.join(cwd, "case.txt"), "HeLLo World\n");
+    // Direct coverage for the fallback path: CI runners may lack ripgrep, and
+    // a missing binary must never surface as a silent "No matches".
+    const out = grepWithJs("number", cwd, { glob: "*.ts", cwd });
+    expect(out).toContain("src/sub/b.ts:1:");
+    expect(out).toContain("const b: number = 2;");
+
+    const ci = grepWithJs("hello", cwd, { ignoreCase: true, cwd });
+    expect(ci).toContain("HeLLo");
+    expect(grepWithJs("hello", cwd, { cwd })).toMatch(/No matches/);
+    expect(grepWithJs("zzz-not-there", cwd, { cwd })).toMatch(/No matches/);
+  });
+
+  it("grep tool itself must produce matches on this machine (rg or fallback)", async () => {
+    // If this fails on a machine WITH ripgrep installed, the rg branch is
+    // broken; without ripgrep, hasRg()/fallback handling is broken.
+    const out = await grepTool.execute({ pattern: "number", glob: "*.ts" }, ctx);
+    expect(out).toContain("const b: number = 2;");
   });
 });

@@ -27,7 +27,7 @@ export { resolveModel, MODEL_CATALOG, type ModelSpec, type ResolvedModel } from 
 export { ReadState } from "./tools/readstate.js";
 export { readTool, editTool, writeTool } from "./tools/files.js";
 export { bashTool, bashOutputTool, Job } from "./tools/bash.js";
-export { globTool, grepTool, globToRegex, walkFiles } from "./tools/search.js";
+export { globTool, grepTool, globToRegex, walkFiles, grepWithJs } from "./tools/search.js";
 export { todoTool, type TodoItem } from "./tools/todo.js";
 export { recallTool } from "./tools/recall.js";
 export { exitPlanTool } from "./tools/plan.js";

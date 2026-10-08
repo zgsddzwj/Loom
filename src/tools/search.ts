@@ -94,13 +94,61 @@ export const globTool: ToolDef = {
   },
 };
 
+/**
+ * spawnSync does NOT throw when the binary is missing — it sets r.error.
+ * A naive try/catch here once made Loom report "No matches" on machines
+ * without ripgrep; the detection must check r.error.
+ */
+let rgAvailable: boolean | undefined;
 function hasRg(): boolean {
-  try {
-    spawnSync("rg", ["--version"], { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
+  if (rgAvailable === undefined) {
+    const r = spawnSync("rg", ["--version"], { stdio: "ignore" });
+    rgAvailable = !r.error;
   }
+  return rgAvailable;
+}
+
+/** Pure-JS grep used when ripgrep is unavailable — exported for direct testing. */
+export function grepWithJs(
+  pattern: string,
+  root: string,
+  opts: { glob?: string; ignoreCase?: boolean; cwd: string },
+): string {
+  const flags = opts.ignoreCase ? "i" : "";
+  let re: RegExp;
+  try {
+    re = new RegExp(pattern, flags);
+  } catch (e) {
+    throw new Error(`Invalid regex: ${(e as Error).message}`);
+  }
+  const files: string[] = [];
+  if (fs.statSync(root).isDirectory()) {
+    const gRe = opts.glob ? globToRegex(opts.glob) : null;
+    for (const f of walkFiles(root)) {
+      if (!gRe || gRe.test(path.basename(f))) files.push(path.join(root, f));
+    }
+  } else {
+    files.push(root);
+  }
+  const results: string[] = [];
+  outer: for (const f of files) {
+    let text: string;
+    try {
+      text = fs.readFileSync(f, "utf8");
+    } catch {
+      continue;
+    }
+    if (text.includes("\0")) continue; // skip binary
+    const lines = text.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      if (re.test(lines[i])) {
+        results.push(`${path.relative(opts.cwd, f)}:${i + 1}:${lines[i].slice(0, 240)}`);
+        if (results.length >= 200) break outer;
+      }
+    }
+  }
+  if (results.length === 0) return `No matches for /${pattern}/${flags} under ${root}.`;
+  return results.join("\n") + `\n[${results.length} match(es), capped at 200]`;
 }
 
 export const grepTool: ToolDef = {
@@ -131,46 +179,16 @@ export const grepTool: ToolDef = {
       if (input.glob) args.push("-g", String(input.glob));
       args.push("--", pattern, root);
       const r = spawnSync("rg", args, { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
-      if (r.status === 2) throw new Error(r.stderr || "ripgrep failed");
-      const lines = (r.stdout || "").split("\n").filter(Boolean).slice(0, 200);
-      if (lines.length === 0) return `No matches for /${pattern}/${flags} under ${root}.`;
-      return lines.join("\n") + `\n[${lines.length} match(es), capped at 200]`;
+      // Any spawn failure (missing binary, EACCES, ...) must fall back to the
+      // JS implementation — never silently report "No matches".
+      if (!r.error) {
+        if (r.status === 2) throw new Error(r.stderr || "ripgrep failed");
+        const lines = (r.stdout || "").split("\n").filter(Boolean).slice(0, 200);
+        if (lines.length === 0) return `No matches for /${pattern}/${flags} under ${root}.`;
+        return lines.join("\n") + `\n[${lines.length} match(es), capped at 200]`;
+      }
     }
 
-    // Pure-JS fallback
-    let re: RegExp;
-    try {
-      re = new RegExp(pattern, flags);
-    } catch (e) {
-      throw new Error(`Invalid regex: ${(e as Error).message}`);
-    }
-    const files: string[] = [];
-    if (fs.statSync(root).isDirectory()) {
-      const gRe = input.glob ? globToRegex(String(input.glob)) : null;
-      for (const f of walkFiles(root)) {
-        if (!gRe || gRe.test(path.basename(f))) files.push(path.join(root, f));
-      }
-    } else {
-      files.push(root);
-    }
-    const results: string[] = [];
-    outer: for (const f of files) {
-      let text: string;
-      try {
-        text = fs.readFileSync(f, "utf8");
-      } catch {
-        continue;
-      }
-      if (text.includes("\0")) continue; // skip binary
-      const lines = text.split("\n");
-      for (let i = 0; i < lines.length; i++) {
-        if (re.test(lines[i])) {
-          results.push(`${path.relative(ctx.cwd, f)}:${i + 1}:${lines[i].slice(0, 240)}`);
-          if (results.length >= 200) break outer;
-        }
-      }
-    }
-    if (results.length === 0) return `No matches for /${pattern}/${flags} under ${root}.`;
-    return results.join("\n") + `\n[${results.length} match(es), capped at 200]`;
+    return grepWithJs(pattern, root, { glob: input.glob ? String(input.glob) : undefined, ignoreCase, cwd: ctx.cwd });
   },
 };
