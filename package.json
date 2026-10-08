@@ -1,0 +1,30 @@
+{
+  "name": "loom-harness",
+  "version": "0.1.0",
+  "description": "Loom — a small-core, fully-logged, provider-agnostic coding agent harness",
+  "type": "module",
+  "license": "MIT",
+  "author": "WangJian (zgsddzwj)",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/zgsddzwj/Loom.git"
+  },
+  "homepage": "https://github.com/zgsddzwj/Loom#readme",
+  "bugs": "https://github.com/zgsddzwj/Loom/issues",
+  "keywords": ["agent", "harness", "coding-agent", "llm", "context-engineering", "cli"],
+  "bin": { "loom": "dist/cli.js" },
+  "main": "dist/index.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "start": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
