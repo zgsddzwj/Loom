@@ -1,6 +1,6 @@
 {
   "name": "loom-harness",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Loom — a small-core, fully-logged, provider-agnostic coding agent harness",
   "type": "module",
   "license": "MIT",

@@ -28,6 +28,11 @@ export interface ToolContext {
   jobs: Map<string, Job>;
   io: ToolIO;
   planGate?: PlanGate;
+  /** Wired by the CLI: spawns a profiled subagent and returns its final message. */
+  spawnSubagent?(input: { agent?: string; description?: string; prompt: string }): Promise<string>;
+  /** When set, bash commands run inside the OS sandbox. null = sandbox
+   *  failed for this command and the caller must refuse (fail-closed). */
+  sandboxWrap?(command: string): string | null;
 }
 
 export interface ToolDef {

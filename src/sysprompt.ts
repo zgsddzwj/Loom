@@ -48,3 +48,47 @@ export function buildSystemPrompt(agentInstructions: string): string {
   if (!agentInstructions.trim()) return base;
   return `${base}\n\n# Project instructions (AGENTS.md)\n\n${agentInstructions}`;
 }
+
+export interface SystemSections {
+  /** AGENTS.md instructions (project + user, budgeted). */
+  agents?: string;
+  /** Only when the task tool is available. */
+  subagents?: boolean;
+  /** Only when the memory tool is available. */
+  memory?: boolean;
+  /** Only when the skill tool is available; text from skillsCatalog(). */
+  skills?: string;
+  /** Cross-session memory content (already budgeted). */
+  memoryText?: string;
+}
+
+/** Compose the full system prompt for the main session. */
+export function composeSystemPrompt(s: SystemSections): string {
+  let out = buildBaseSystemPrompt();
+  if (s.subagents) {
+    out +=
+      "\n\n# Subagents\n\n" +
+      "The task tool delegates to subagents with their own context windows; only their final " +
+      "message returns to you (full transcripts are journaled). Delegate broad searches and " +
+      "heavy output you do not need verbatim to an \"explore\" subagent. For any non-trivial " +
+      "deliverable, consider a \"judge\" subagent for an independent read-only acceptance pass " +
+      "before you claim success.";
+  }
+  if (s.memory) {
+    out +=
+      "\n\n# Cross-session memory\n\n" +
+      "The memory tool persists durable facts (preferences, conventions, decisions) to a " +
+      "cross-session memory file that is loaded into every future session. Use `append` for " +
+      "facts worth remembering; do not log transient task details there.";
+  }
+  if (s.memoryText) {
+    out += `\n\n# Remembered from previous sessions\n\n${s.memoryText}`;
+  }
+  if (s.skills) {
+    out += `\n\n${s.skills}`;
+  }
+  if (s.agents) {
+    out += `\n\n# Project instructions (AGENTS.md)\n\n${s.agents}`;
+  }
+  return out;
+}

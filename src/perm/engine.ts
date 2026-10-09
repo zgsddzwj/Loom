@@ -76,6 +76,10 @@ export class PermissionEngine {
   getMode(): PermMode {
     return this.mode;
   }
+  /** Wire/replace the interactive ask IO (REPL sets it after readline exists). */
+  setAskIO(io: AskIO | undefined): void {
+    this.io = io;
+  }
 
   async check(
     tool: { name: string; readonly: boolean },

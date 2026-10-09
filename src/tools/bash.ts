@@ -100,7 +100,18 @@ export const bashTool: ToolDef = {
     const command = String(input.command ?? "");
     if (!command.trim()) throw new ToolError("Empty command.");
     const timeout = Math.max(1000, Number(input.timeout_ms ?? 120_000));
-    const job = new Job(command, ctx.cwd, ctx.artifacts.dir);
+    let effective = command;
+    if (ctx.sandboxWrap) {
+      const wrapped = ctx.sandboxWrap(command);
+      if (wrapped === null || wrapped === undefined) {
+        throw new ToolError(
+          "Sandboxed execution is required, but the OS sandbox could not wrap this command — " +
+            "refusing to run unsandboxed (fail-closed).",
+        );
+      }
+      effective = wrapped;
+    }
+    const job = new Job(effective, ctx.cwd, ctx.artifacts.dir);
     ctx.jobs.set(job.id, job);
     return job.wait(timeout);
   },

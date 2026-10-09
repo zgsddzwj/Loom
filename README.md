@@ -29,7 +29,7 @@ Loom 是一个开源（MIT）、模型无关的 AI 编程 Agent Harness。它是
 4. **模型无关 + 密钥卫生**（继承 ZCode 双协议，修掉它的明文 key）：一套代码同时讲 Anthropic Messages 和 OpenAI 兼容两种协议；密钥只从环境变量读取，任何配置文件里都不会出现。
 5. **轻到可以读完**：零运行时依赖、单包模块化（刻意不做 dsh 那种 54 包 monorepo），核心循环 + 权限 + 压缩一共几千行 TypeScript，一个下午能通读——这对想改造 harness 的人是本质区别。
 
-> 诚实说明：Loom 是年轻的 MVP（子代理/judge、skills、MCP、沙箱在 M3/M4 路线图中）；上表中关于 dsh / Claude Code / Codex 的事实与第三方评测数据（如 dsh 以约 1/6 于 Claude Code 的成本达到相近通过率）来自公开资料，出处全部列在 [docs/DESIGN.md](docs/DESIGN.md) 第 12 节。
+> 诚实说明：Loom 很年轻（v0.2.0 刚补齐子代理/沙箱/插件/评测版图），尚无自己的公开基准跑分；上表中关于 dsh / Claude Code / Codex 的事实与第三方评测数据（如 dsh 以约 1/6 于 Claude Code 的成本达到相近通过率）来自公开资料，出处全部列在 [docs/DESIGN.md](docs/DESIGN.md) 第 12 节。
 
 ## 核心特性（源自四家精华）
 
@@ -38,13 +38,20 @@ Loom 是一个开源（MIT）、模型无关的 AI 编程 Agent Harness。它是
 | **Append-only 会话日志 = 唯一事实源** | DeepSeek Harness | "Model-visible means logged"：模型看到的一切都是日志的纯函数投影，可 fork / resume / replay，`loom replay --verify` 验证确定性 |
 | **客户端强制权限** | Claude Code | allow/ask/deny 规则由 harness 执行，模型提示词无法绕过；四模式：default / acceptEdits / plan / bypassPermissions |
 | **Plan mode** | Claude Code | 只读工具集 + `exit_plan` 审批门，用户批准后自动切换执行模式 |
+| **子代理三 profile + judge 验收闭环** | Claude Code + ZCode | `task` 工具委派 general / explore（只读）/ judge 三个子代理：独立上下文窗口、工具白名单、独立子会话日志；judge 按严格 JSON verdict 验收交付物 |
 | **可召回压缩** | 修正 dsh 最大缺陷 | 压缩时全文 spill 成工件，`recall(locator)` 随时取回——压缩永不丢信息 |
 | **工具结果预剪枝 + spill** | dsh + ZCode | 超过 30KB 的工具输出自动外置，返回截断头 + locator |
+| **渐进披露 Skills** | Claude Code + ZCode | 仅 name+description 常驻系统提示词（目录），`skill` 工具按需加载正文；项目级同名 shadow 用户级 |
+| **跨会话记忆（一等公民）** | 修正 dsh "记忆无主" | `memory` 工具 + `~/.loom/memory.md`（预算封顶、用户可直接编辑）——核心所有，不做插件 |
 | **机械强制 read-before-edit** | Claude Code | 未读文件无法编辑；读后被外部改动也会被 mtime 校验拦下 |
 | **Bash 超时不杀进程** | dsh | 超时命令转后台 job，`bash_output` 轮询——长构建/服务不被腰斩 |
+| **MCP stdio client** | 通用标准 | `mcp__<server>__<tool>` 命名桥接进注册表，结果同样剪枝/鉴权/入日志 |
 | **双协议多 Provider** | ZCode | Anthropic Messages + OpenAI 兼容（DeepSeek / 智谱 GLM / Kimi / Ollama / vLLM / one-api 全兼容），密钥只从环境变量读取 |
 | **7 事件 Hooks** | Claude Code / ZCode | SessionStart / UserPromptSubmit / PreToolUse / PermissionRequest / PostToolUse / PostToolUseFailure / Stop |
+| **OS 级沙箱** | Codex | macOS Seatbelt / Linux bwrap：内可写、外拒写、网络禁；bypass 模式自动启用，封装失败 fail-closed 拒跑 |
+| **插件 + sha256 信任门** | 修正 ZCode "hook 无信任门" | 插件打包 skills/commands/hooks，首次须 `loom plugin trust`；文件变动即指纹失效（fail-closed 停用） |
 | **AGENTS.md（64KB 预算）** | Codex + dsh | 宽文件先逐出、最具体文件最后截断；兼容 CLAUDE.md |
+| **`loom eval` 可复现评测** | dsh | 每任务隔离 workspace + 独立会话日志，verify.sh 判定，results.jsonl 落盘（样例见 `benchmarks/samples/`） |
 
 ## 快速开始
 
@@ -52,7 +59,7 @@ Loom 是一个开源（MIT）、模型无关的 AI 编程 Agent Harness。它是
 git clone git@github.com:zgsddzwj/Loom.git && cd Loom
 npm install            # 安装 dev 依赖（零运行时依赖）
 npm run build          # 编译到 dist/
-npm test               # 39 个测试（含全链路冒烟）
+npm test               # 68 个测试（含全链路冒烟、真实 MCP 子进程、macOS 沙箱实机断言）
 
 # 配置任意一家模型的 key（只从环境变量读取，绝不落盘）
 export DEEPSEEK_API_KEY=sk-...        # 或 ZHIPU_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY / MOONSHOT_API_KEY
@@ -64,6 +71,11 @@ node dist/cli.js --plan               # 规划模式启动
 node dist/cli.js -p "修复失败的测试"    # 无头单发（权限 fail-closed）
 node dist/cli.js --resume latest      # 续上次会话
 node dist/cli.js replay latest --verify --json   # 重建逐字节模型上下文
+
+# 生态（v0.2.0）
+node dist/cli.js plugin list          # 查看插件与信任状态
+node dist/cli.js plugin trust my-plugin    # 信任一个插件（sha256 指纹门）
+node dist/cli.js eval benchmarks/samples   # 可复现评测（需模型 key）
 ```
 
 `.loom/config.json`（项目级，优先）与 `~/.loom/config.json`（用户级）：
@@ -97,21 +109,33 @@ src/
 ├── context/    artifacts / pruner / manager（可召回压缩）/ tokens 估算
 ├── perm/       客户端强制权限引擎（规则 + 四模式 + fail-closed）
 ├── hooks/      7 事件 runner（退出码 2 = 阻断）
-├── memory/     AGENTS.md 加载（64KB 预算、宽文件先逐出）
+├── memory/     AGENTS.md 预算加载 + 跨会话记忆 store + memory 工具
 ├── providers/  anthropic.ts + openai.ts 双协议 + catalog.ts 模型目录
-├── tools/      read/edit/write/bash/grep/glob/todo/recall + read-state 强制
-├── sysprompt.ts  纪律优先系统提示词
-└── cli.ts      REPL + -p + --resume + replay
+├── tools/      read/edit/write/bash/grep/glob/todo/recall/task/skill + read-state 强制
+├── subagents/  general / explore / judge 三 profile + 子会话 spawner
+├── skills/     渐进披露 loader + skill 工具
+├── mcp/        stdio JSON-RPC client + 注册表桥接
+├── sandbox/    seatbelt（双语法探测+realpath 规范化）/ bwrap
+├── plugins/    manifest 加载 + sha256 信任门
+├── commands/   slash 命令模板（$ARGUMENTS）
+├── eval/       可复现评测 runner
+├── sysprompt.ts  纪律优先系统提示词 + composeSystemPrompt
+└── cli.ts      REPL + -p + --resume + replay + plugin/eval 子命令
 ```
 
 SDK 用法：`import { EventLog, project, runTurn, ... } from "loom-harness"`（见 `src/index.ts` 导出面）。
 
+## 扩展点速览
+
+- **Skill**：`~/.loom/skills/<name>/SKILL.md`（frontmatter: name/description；正文触发时加载）
+- **Slash 命令**：`~/.loom/commands/foo.md` 或 `.loom/commands/foo.md`（frontmatter: description；正文 `$ARGUMENTS` 占位）→ REPL 里 `/foo 参数`
+- **插件**：`~/.loom/plugins/<name>/`（plugin.json + skills/ + commands/ + hooks.json），先 `loom plugin trust <name>`
+- **MCP**：`.loom/config.json` → `{"mcp":{"servers":{"name":{"command":"...","args":[...]}}}}`
+- **记忆**：`memory` 工具自动维护 `~/.loom/memory.md`，也可直接编辑
+
 ## 路线图
 
-- **M3**：子代理（Explore 只读 profile）、judge 验收代理、skills 渐进披露、跨会话记忆、MCP client
-- **M4**：插件打包 + 信任门、OS 沙箱（seatbelt/bwrap）、`loom eval` 可复现评测
-
-详见 [docs/DESIGN.md](docs/DESIGN.md) 第 11 节。
+M0–M4 全部落地（v0.2.0）。后续想法：HTTP/SSE MCP 传输、子代理并行执行与双向通信、WebFetch/WebSearch 工具、插件市场与 `npx` 分发。详见 [docs/DESIGN.md](docs/DESIGN.md) 第 11 节。
 
 ## License
 

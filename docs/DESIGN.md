@@ -310,15 +310,15 @@ Claude Code 泄露提示词分析 + dsh AGENTS.md 指令哲学的融合，核心
 
 ## 11. 路线图与验收标准
 
-| 阶段 | 内容 | 验收标准 |
-|---|---|---|
-| M0 | 脚手架 + 本设计文档 | 文档完成 |
-| M1 | 最小可复现内核：双协议 provider、事件日志、projector、agent loop、read/edit/write/bash/grep/glob/todo、系统提示词、REPL + `-p` + `--resume` + `replay` | 真实仓库多文件任务；`--resume` 续会话；**日志重放投影逐字节一致** |
-| M2 | 权限引擎（4 模式+规则+plan mode）、hook runner（7 事件）、预剪枝+spill+recall、缓存对齐可召回压缩 | 无信任门不执行；30+ 轮长会话存活压缩且 recall 可取回被压内容 |
-| M3 | 子代理（Explore 只读 profile）、judge 验收代理、skills 渐进披露、跨会话记忆、MCP client | 交付物经 judge JSON verdict 验收 |
-| M4 | 插件打包与信任门、OS 沙箱、`loom eval` | 沙箱内 bypass 模式全流程安全 |
+| 阶段 | 内容 | 验收标准 | 状态 |
+|---|---|---|---|
+| M0 | 脚手架 + 本设计文档 | 文档完成 | ✅ v0.1.0 |
+| M1 | 最小可复现内核：双协议 provider、事件日志、projector、agent loop、read/edit/write/bash/grep/glob/todo、系统提示词、REPL + `-p` + `--resume` + `replay` | 真实仓库多文件任务；`--resume` 续会话；日志重放投影逐字节一致 | ✅ v0.1.0 |
+| M2 | 权限引擎（4 模式+规则+plan mode）、hook runner（7 事件）、预剪枝+spill+recall、缓存对齐可召回压缩 | 无信任门不执行；30+ 轮长会话存活压缩且 recall 可取回被压内容 | ✅ v0.1.0 |
+| M3 | 子代理（general/explore 只读/judge 验收）、skills 渐进披露、跨会话记忆、MCP stdio client | 子代理独立日志+工具白名单；judge 严格 JSON verdict；MCP 真实子进程连通 | ✅ v0.2.0 |
+| M4 | OS 沙箱（seatbelt/bwrap）、插件信任门（sha256 指纹）、slash commands、`loom eval` | 沙箱内写/外拒/网禁实机验证；插件未信任 fail-closed；eval 每任务隔离可回放 | ✅ v0.2.0 |
 
-当前实现状态：**M0–M2 已实现**（见 README 用法）；M3/M4 为路线图。
+后续想法（M5+）：HTTP/SSE MCP 传输、子代理并行执行与双向通信、WebFetch/WebSearch 工具、插件市场与 npx 分发。
 
 ---
 
