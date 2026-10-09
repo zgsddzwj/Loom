@@ -66,7 +66,8 @@ export class OpenAICompatAdapter implements ModelAdapter {
         : {}),
     };
 
-    const res = await fetch(`${this.opts.baseUrl}/chat/completions`, {
+    const url = `${this.opts.baseUrl}/chat/completions`;
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -76,7 +77,12 @@ export class OpenAICompatAdapter implements ModelAdapter {
       signal: req.signal,
     });
     if (!res.ok) {
-      throw new Error(`OpenAI-compatible API ${res.status}: ${(await res.text()).slice(0, 500)}`);
+      const detail = (await res.text()).slice(0, 500);
+      throw new Error(
+        `OpenAI-compatible API ${res.status} at ${url}${detail ? `: ${detail}` : ""} — ` +
+          `check LOOM_BASE_URL (it must be the chat-completions root, e.g. https://api.deepseek.com/v1); ` +
+          `for Anthropic-protocol gateways use the "anthropic:<model>" prefix instead`,
+      );
     }
 
     const acc = new Map<number, { id: string; name: string; args: string }>();

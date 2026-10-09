@@ -31,6 +31,7 @@ export class AnthropicAdapter implements ModelAdapter {
 
   async *complete(req: ModelRequest): AsyncIterable<StreamEvent> {
     const base = this.opts.baseUrl ?? "https://api.anthropic.com";
+    const url = `${base}/v1/messages`;
     const body = {
       model: this.opts.model,
       max_tokens: req.maxTokens ?? this.opts.maxTokens ?? 8192,
@@ -43,17 +44,26 @@ export class AnthropicAdapter implements ModelAdapter {
         input_schema: t.inputSchema,
       })),
     };
-    const res = await fetch(`${base}/v1/messages`, {
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "x-api-key": this.opts.apiKey,
+        // Some Anthropic-protocol gateways only accept Bearer (e.g. Volcano
+        // Ark); native keys (sk-ant-) stay on x-api-key alone.
+        ...(this.opts.apiKey.startsWith("sk-ant-") ? {} : { authorization: `Bearer ${this.opts.apiKey}` }),
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify(body),
       signal: req.signal,
     });
-    if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${(await res.text()).slice(0, 500)}`);
+    if (!res.ok) {
+      const detail = (await res.text()).slice(0, 500);
+      throw new Error(
+        `Anthropic API ${res.status} at ${url}${detail ? `: ${detail}` : ""} — ` +
+          `check LOOM_BASE_URL and the protocol prefix (use "anthropic:<model>" for Anthropic-protocol gateways)`,
+      );
+    }
 
     const tools = new Map<number, { id: string; name: string; json: string }>();
     let stopReason = "end_turn";
