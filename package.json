@@ -13,10 +13,19 @@
   "bugs": "https://github.com/zgsddzwj/Loom/issues",
   "keywords": ["agent", "harness", "coding-agent", "llm", "context-engineering", "cli"],
   "bin": { "loom": "dist/cli.js" },
+  "files": [
+    "dist",
+    "docs",
+    "benchmarks",
+    "README.md",
+    "LICENSE",
+    "AGENTS.md"
+  ],
   "main": "dist/index.js",
   "engines": { "node": ">=20" },
   "scripts": {
     "build": "tsc",
+    "prepare": "npm run build",
     "test": "vitest run",
     "start": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit"

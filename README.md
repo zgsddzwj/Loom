@@ -53,7 +53,38 @@ Loom 是一个开源（MIT）、模型无关的 AI 编程 Agent Harness。它是
 | **AGENTS.md（64KB 预算）** | Codex + dsh | 宽文件先逐出、最具体文件最后截断；兼容 CLAUDE.md |
 | **`loom eval` 可复现评测** | dsh | 每任务隔离 workspace + 独立会话日志，verify.sh 判定，results.jsonl 落盘（样例见 `benchmarks/samples/`） |
 
-## 快速开始
+## 安装（给使用者）
+
+**方式一：一条命令装全局**（需要 Node ≥ 20，npm 会自动拉源码并编译）：
+
+```bash
+npm install -g github:zgsddzwj/Loom
+loom --help
+```
+
+**方式二：clone 源码运行**（适合想读代码、做改造的人）：
+
+```bash
+git clone https://github.com/zgsddzwj/Loom.git && cd Loom
+npm install          # prepare 钩子自动编译到 dist/
+node dist/cli.js     # 或 npm link 之后直接敲 loom
+```
+
+**接上任意一个模型**（key 只从环境变量读取，绝不落盘；建议写进 `~/.zshrc`）：
+
+```bash
+export DEEPSEEK_API_KEY=sk-...                          # DeepSeek
+# export ZHIPU_API_KEY=...                               # 智谱开放平台
+# export ANTHROPIC_API_KEY=sk-ant-...                    # Claude（原生协议）
+# 火山方舟等 Anthropic 协议网关（注意 anthropic: 前缀）：
+# export LOOM_MODEL="anthropic:glm-5.3-flash" LOOM_BASE_URL="https://ark.cn-beijing.volces.com/api/coding" LOOM_API_KEY=ark-...
+# 本地 Ollama / 任意 OpenAI 兼容端点：
+# export LOOM_API_KEY=ollama LOOM_BASE_URL=http://localhost:11434/v1 LOOM_MODEL=qwen3:14b
+
+loom                    # 开始
+```
+
+## 快速开始（开发者）
 
 ```bash
 git clone git@github.com:zgsddzwj/Loom.git && cd Loom
