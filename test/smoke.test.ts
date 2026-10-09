@@ -146,7 +146,8 @@ describe("smoke: scripted model drives the real loop end-to-end", () => {
     const { cwd, log, deps } = setup(script);
     const hooks = new HookRunner(
       {
-        PreToolUse: [{ command: `case "$LOOM_EVENT" in *) exit 2 ;; esac`, matcher: "write" }],
+        // plain `exit 2` — shell-agnostic, no syntax dependencies
+        PreToolUse: [{ command: "exit 2", matcher: "write" }],
       },
       cwd,
     );

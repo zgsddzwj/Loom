@@ -68,21 +68,31 @@ export class HookRunner {
     });
     const out: HookOutcome = {};
     for (const s of specs) {
-      let r: ReturnType<typeof spawnSync>;
-      try {
-        r = spawnSync(process.env.SHELL || "/bin/bash", ["-c", s.command], {
-          input: JSON.stringify(payload),
-          env: { ...process.env, LOOM_EVENT: event, LOOM_PROJECT_DIR: this.projectDir },
-          timeout: (s.timeout ?? 10) * 1000,
-          maxBuffer: 10 * 1024 * 1024,
-          encoding: "utf8",
-        });
-      } catch (e) {
-        this.warn(`hook for ${event} crashed: ${(e as Error).message}`);
-        continue;
+      let r: ReturnType<typeof spawnSync> | undefined;
+      // Try the user's shell first; on any spawn failure retry once with
+      // /bin/sh (covers exotic SHELL values and transient EAGAIN under load).
+      const shells = [process.env.SHELL || "/bin/bash", "/bin/sh"];
+      let lastError: string | undefined;
+      for (const shell of shells) {
+        try {
+          const attempt = spawnSync(shell, ["-c", s.command], {
+            input: JSON.stringify(payload),
+            env: { ...process.env, LOOM_EVENT: event, LOOM_PROJECT_DIR: this.projectDir },
+            timeout: (s.timeout ?? 10) * 1000,
+            maxBuffer: 10 * 1024 * 1024,
+            encoding: "utf8",
+          });
+          if (!attempt.error) {
+            r = attempt;
+            break;
+          }
+          lastError = attempt.error.message;
+        } catch (e) {
+          lastError = (e as Error).message;
+        }
       }
-      if (r.error) {
-        this.warn(`hook for ${event} failed to run: ${r.error.message}`);
+      if (!r) {
+        this.warn(`hook for ${event} failed to run: ${lastError ?? "unknown spawn error"}`);
         continue;
       }
       if (r.status === 2) {
